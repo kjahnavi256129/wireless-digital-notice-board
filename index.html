@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wireless Digital Notice Board</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Wireless Digital Notice Board</h1>
+    <h2>Login</h2>
+
+    <form id="loginForm">
+      <input type="text" id="username" placeholder="Enter username" required>
+      <input type="password" id="password" placeholder="Enter password" required>
+      <button type="submit">Login</button>
+    </form>
+
+    <p id="message"></p>
+
+    <section id="dashboard" hidden>
+      <h2>Welcome!</h2>
+      <button id="logoutBtn">Logout</button>
+
+      <h3>Send Notice</h3>
+      <textarea id="noticeText" placeholder="Type your notice here"></textarea>
+      <button id="sendBtn">Send Notice</button>
+
+      <h3>Schedule Notice</h3>
+      <input type="date" id="scheduleDate">
+      <input type="time" id="scheduleTime">
+      <button id="scheduleBtn">Schedule Notice</button>
+
+      <h3>Notice History</h3>
+      <ul id="history"></ul>
+
+      <p id="boardNotice">Notice will appear here.</p>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
