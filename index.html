@@ -1,3 +1,4 @@
+ 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,28 +10,53 @@
 <body>
   <div class="container">
     <h1>Wireless Digital Notice Board</h1>
-    <h2>Login</h2>
 
-    <form id="loginForm">
-      <input type="text" id="username" placeholder="Enter username" required>
-      <input type="password" id="password" placeholder="Enter password" required>
-      <button type="submit">Login</button>
-    </form>
+    <section id="authSection">
+      <h2 id="formTitle">Login</h2>
 
-    <p id="message"></p>
+      <form id="loginForm">
+        <input
+          type="text"
+          id="username"
+          placeholder="Enter username"
+          minlength="3"
+          required
+        >
+
+        <input
+          type="password"
+          id="password"
+          placeholder="Enter password (minimum 6 characters)"
+          minlength="6"
+          required
+        >
+
+        <button type="submit" id="loginBtn">Login</button>
+      </form>
+
+      <button type="button" id="toggleForm">
+        Create Account / Sign Up
+      </button>
+
+      <p id="message" role="status"></p>
+    </section>
 
     <section id="dashboard" hidden>
-      <h2>Welcome!</h2>
-      <button id="logoutBtn">Logout</button>
+      <h2>Welcome, <span id="currentUser"></span>!</h2>
+
+      <button type="button" id="logoutBtn">Logout</button>
 
       <h3>Send Notice</h3>
-      <textarea id="noticeText" placeholder="Type your notice here"></textarea>
-      <button id="sendBtn">Send Notice</button>
+      <textarea
+        id="noticeText"
+        placeholder="Type your notice here"
+      ></textarea>
+      <button type="button" id="sendBtn">Send Notice</button>
 
       <h3>Schedule Notice</h3>
       <input type="date" id="scheduleDate">
       <input type="time" id="scheduleTime">
-      <button id="scheduleBtn">Schedule Notice</button>
+      <button type="button" id="scheduleBtn">Schedule Notice</button>
 
       <h3>Notice History</h3>
       <ul id="history"></ul>
