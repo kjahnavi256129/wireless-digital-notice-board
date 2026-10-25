@@ -104,6 +104,86 @@ def login():
 # Initialize database when Gunicorn loads the application.
 init_db()
 
+@app.route("/notices", methods=["GET"])
+def get_notices():
+    username = request.args.get("username", "").strip()
+
+    if not username:
+        return jsonify({"message": "Username required."}), 400
+
+    try:
+        with get_db() as con:
+            with con.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS notices (
+                        id SERIAL PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        notice_text TEXT NOT NULL,
+                        scheduled_at TIMESTAMP NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                cur.execute("""
+                    SELECT id, notice_text, scheduled_at, created_at
+                    FROM notices
+                    WHERE username = %s
+                    ORDER BY created_at DESC
+                """, (username,))
+                rows = cur.fetchall()
+
+        return jsonify([
+            {
+                "id": row[0],
+                "notice": row[1],
+                "scheduled_at": row[2].isoformat() if row[2] else None,
+                "created_at": row[3].isoformat() if row[3] else None
+            }
+            for row in rows
+        ])
+
+    except psycopg2.Error:
+        app.logger.exception("Database notice retrieval error")
+        return jsonify({"message": "Could not retrieve notices."}), 500
+
+
+@app.route("/notices", methods=["POST"])
+def save_notice():
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip()
+    notice_text = data.get("notice", "").strip()
+    scheduled_at = data.get("scheduled_at") or None
+
+    if not username or not notice_text:
+        return jsonify({"message": "Username and notice are required."}), 400
+
+    try:
+        with get_db() as con:
+            with con.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS notices (
+                        id SERIAL PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        notice_text TEXT NOT NULL,
+                        scheduled_at TIMESTAMP NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                cur.execute("""
+                    INSERT INTO notices (username, notice_text, scheduled_at)
+                    VALUES (%s, %s, %s)
+                    RETURNING id
+                """, (username, notice_text, scheduled_at))
+                notice_id = cur.fetchone()[0]
+
+        return jsonify({
+            "message": "Notice saved successfully!",
+            "id": notice_id
+        }), 201
+
+    except (psycopg2.Error, ValueError):
+        app.logger.exception("Database notice save error")
+        return jsonify({"message": "Could not save notice."}), 500
+
 
 if __name__ == "__main__":
     app.run(
