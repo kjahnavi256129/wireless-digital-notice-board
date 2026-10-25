@@ -11,8 +11,7 @@ const toggleForm = document.getElementById("toggleForm");
 
 let isRegisterMode = false;
 let currentUser = "";
-
-let notices = JSON.parse(localStorage.getItem("notices") || "[]");
+let notices = [];
 
 toggleForm.addEventListener("click", function () {
   isRegisterMode = !isRegisterMode;
@@ -60,21 +59,25 @@ loginForm.addEventListener("submit", async function (event) {
 
     if (isRegisterMode) {
       message.textContent = "Account created! You can now log in.";
+
       isRegisterMode = false;
       formTitle.textContent = "Login";
       loginBtn.textContent = "Login";
       toggleForm.textContent = "Create Account / Sign Up";
+
       loginForm.reset();
       return;
     }
 
     currentUser = username;
+
     document.getElementById("currentUser").textContent = currentUser;
 
     authSection.hidden = true;
     dashboard.hidden = false;
     message.textContent = "";
-    showHistory();
+
+    await loadHistory();
   } catch (error) {
     message.textContent =
       "Could not connect to the server. Please try again.";
@@ -83,25 +86,72 @@ loginForm.addEventListener("submit", async function (event) {
   }
 });
 
+async function loadHistory() {
+  try {
+    const response = await fetch(
+      API_URL + "/notices?username=" + encodeURIComponent(currentUser)
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Could not load notices.");
+    }
+
+    notices = data;
+    showHistory();
+  } catch (error) {
+    alert("Could not load notice history from the database.");
+  }
+}
+
 function showHistory() {
   const history = document.getElementById("history");
   history.innerHTML = "";
 
   notices.forEach(function (item) {
     const li = document.createElement("li");
-    li.textContent = item;
+
+    const dateValue = item.scheduled_at || item.created_at;
+    const dateText = dateValue
+      ? new Date(dateValue).toLocaleString()
+      : "";
+
+    li.textContent =
+      (item.scheduled_at ? "Scheduled: " : "") +
+      dateText +
+      " — " +
+      item.notice;
+
     history.appendChild(li);
   });
 }
 
-function saveNotice(text) {
-  notices.unshift(new Date().toLocaleString() + " — " + text);
-  localStorage.setItem("notices", JSON.stringify(notices));
+async function saveNotice(text, scheduledAt = null) {
+  const response = await fetch(API_URL + "/notices", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      username: currentUser,
+      notice: text,
+      scheduled_at: scheduledAt
+    })
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Could not save notice.");
+  }
+
+  await loadHistory();
+
   document.getElementById("boardNotice").textContent = text;
-  showHistory();
 }
 
-document.getElementById("sendBtn").addEventListener("click", function () {
+document.getElementById("sendBtn").addEventListener("click", async function () {
   const text = document.getElementById("noticeText").value.trim();
 
   if (!text) {
@@ -109,11 +159,18 @@ document.getElementById("sendBtn").addEventListener("click", function () {
     return;
   }
 
-  saveNotice(text);
-  document.getElementById("noticeText").value = "";
+  try {
+    await saveNotice(text);
+
+    document.getElementById("noticeText").value = "";
+
+    alert("Notice saved to the database!");
+  } catch (error) {
+    alert(error.message);
+  }
 });
 
-document.getElementById("scheduleBtn").addEventListener("click", function () {
+document.getElementById("scheduleBtn").addEventListener("click", async function () {
   const text = document.getElementById("noticeText").value.trim();
   const date = document.getElementById("scheduleDate").value;
   const time = document.getElementById("scheduleTime").value;
@@ -123,26 +180,36 @@ document.getElementById("scheduleBtn").addEventListener("click", function () {
     return;
   }
 
-  const scheduledTime = new Date(date + "T" + time).getTime();
+  const scheduledDate = new Date(date + "T" + time);
 
-  if (scheduledTime <= Date.now()) {
+  if (
+    Number.isNaN(scheduledDate.getTime()) ||
+    scheduledDate.getTime() <= Date.now()
+  ) {
     alert("Please choose a future date and time.");
     return;
   }
 
-  const timer = scheduledTime - Date.now();
+  try {
+    await saveNotice(text, scheduledDate.toISOString());
 
-  alert("Notice scheduled! Keep this page open until the scheduled time.");
+    document.getElementById("noticeText").value = "";
 
-  setTimeout(function () {
-    saveNotice("Scheduled: " + text);
-  }, timer);
+    alert(
+      "Schedule saved to the database. Automatic delivery at the scheduled time is not enabled yet."
+    );
+  } catch (error) {
+    alert(error.message);
+  }
 });
 
 document.getElementById("logoutBtn").addEventListener("click", function () {
   dashboard.hidden = true;
   authSection.hidden = false;
+
   loginForm.reset();
   message.textContent = "You have logged out.";
+
   currentUser = "";
+  notices = [];
 });
