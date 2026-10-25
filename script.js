@@ -11,17 +11,16 @@ const toggleForm = document.getElementById("toggleForm");
 
 let isRegisterMode = false;
 let currentUser = "";
+let authToken = "";
 let notices = [];
 
 toggleForm.addEventListener("click", function () {
   isRegisterMode = !isRegisterMode;
-
   formTitle.textContent = isRegisterMode ? "Create Account" : "Login";
   loginBtn.textContent = isRegisterMode ? "Sign Up" : "Login";
   toggleForm.textContent = isRegisterMode
     ? "Already have an account? Login"
     : "Create Account / Sign Up";
-
   message.textContent = "";
   loginForm.reset();
 });
@@ -32,10 +31,7 @@ loginForm.addEventListener("submit", async function (event) {
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value;
 
-  message.textContent = isRegisterMode
-    ? "Creating account..."
-    : "Logging in...";
-
+  message.textContent = isRegisterMode ? "Creating account..." : "Logging in...";
   loginBtn.disabled = true;
 
   try {
@@ -43,9 +39,7 @@ loginForm.addEventListener("submit", async function (event) {
       API_URL + (isRegisterMode ? "/register" : "/login"),
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
       }
     );
@@ -59,50 +53,53 @@ loginForm.addEventListener("submit", async function (event) {
 
     if (isRegisterMode) {
       message.textContent = "Account created! You can now log in.";
-
       isRegisterMode = false;
       formTitle.textContent = "Login";
       loginBtn.textContent = "Login";
       toggleForm.textContent = "Create Account / Sign Up";
-
       loginForm.reset();
       return;
     }
 
-    currentUser = username;
+    authToken = data.token;
+    currentUser = data.username;
+
+    if (!authToken || !currentUser) {
+      message.textContent = "Login response incomplete. Please try again.";
+      return;
+    }
 
     document.getElementById("currentUser").textContent = currentUser;
-
     authSection.hidden = true;
     dashboard.hidden = false;
     message.textContent = "";
 
     await loadHistory();
   } catch (error) {
-    message.textContent =
-      "Could not connect to the server. Please try again.";
+    message.textContent = "Could not connect to the server. Please try again.";
   } finally {
     loginBtn.disabled = false;
   }
 });
 
 async function loadHistory() {
-  try {
-    const response = await fetch(
-      API_URL + "/notices?username=" + encodeURIComponent(currentUser)
-    );
+  const response = await fetch(API_URL + "/notices", {
+    headers: { "Authorization": "Bearer " + authToken }
+  });
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.message || "Could not load notices.");
-    }
-
-    notices = data;
-    showHistory();
-  } catch (error) {
-    alert("Could not load notice history from the database.");
+  if (response.status === 401) {
+    logout("Session expired. Please log in again.");
+    return;
   }
+
+  if (!response.ok) {
+    throw new Error(data.message || "Could not load notices.");
+  }
+
+  notices = data;
+  showHistory();
 }
 
 function showHistory() {
@@ -111,17 +108,12 @@ function showHistory() {
 
   notices.forEach(function (item) {
     const li = document.createElement("li");
-
     const dateValue = item.scheduled_at || item.created_at;
-    const dateText = dateValue
-      ? new Date(dateValue).toLocaleString()
-      : "";
+    const dateText = dateValue ? new Date(dateValue).toLocaleString() : "";
 
     li.textContent =
       (item.scheduled_at ? "Scheduled: " : "") +
-      dateText +
-      " — " +
-      item.notice;
+      dateText + " — " + item.notice;
 
     history.appendChild(li);
   });
@@ -131,10 +123,10 @@ async function saveNotice(text, scheduledAt = null) {
   const response = await fetch(API_URL + "/notices", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + authToken
     },
     body: JSON.stringify({
-      username: currentUser,
       notice: text,
       scheduled_at: scheduledAt
     })
@@ -142,12 +134,16 @@ async function saveNotice(text, scheduledAt = null) {
 
   const data = await response.json();
 
+  if (response.status === 401) {
+    logout("Session expired. Please log in again.");
+    throw new Error("Please log in again.");
+  }
+
   if (!response.ok) {
     throw new Error(data.message || "Could not save notice.");
   }
 
   await loadHistory();
-
   document.getElementById("boardNotice").textContent = text;
 }
 
@@ -161,9 +157,7 @@ document.getElementById("sendBtn").addEventListener("click", async function () {
 
   try {
     await saveNotice(text);
-
     document.getElementById("noticeText").value = "";
-
     alert("Notice saved to the database!");
   } catch (error) {
     alert(error.message);
@@ -192,9 +186,7 @@ document.getElementById("scheduleBtn").addEventListener("click", async function 
 
   try {
     await saveNotice(text, scheduledDate.toISOString());
-
     document.getElementById("noticeText").value = "";
-
     alert(
       "Schedule saved to the database. Automatic delivery at the scheduled time is not enabled yet."
     );
@@ -203,13 +195,16 @@ document.getElementById("scheduleBtn").addEventListener("click", async function 
   }
 });
 
-document.getElementById("logoutBtn").addEventListener("click", function () {
+function logout(statusMessage = "You have logged out.") {
   dashboard.hidden = true;
   authSection.hidden = false;
-
   loginForm.reset();
-  message.textContent = "You have logged out.";
-
+  message.textContent = statusMessage;
   currentUser = "";
+  authToken = "";
   notices = [];
+}
+
+document.getElementById("logoutBtn").addEventListener("click", function () {
+  logout();
 });
